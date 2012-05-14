@@ -40,4 +40,6 @@ function [x, voltas, erro, aprox] = gauss_seidel(A, b, x0, tol, ite, tipo)
                 x0 = x;
             end
     end
+    
+    aprox = M;
 end

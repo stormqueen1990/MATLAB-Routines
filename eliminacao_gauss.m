@@ -1,4 +1,12 @@
 function [sol, triang, tipo] = eliminacao_gauss(A, x)
+% Autores: Mauren Berti e Fernando Melo
+% Monta uma matriz representando um sistema de equações e a triangulariza.
+% Recebe 2 parâmetros: A, a matriz dos coeficientes das equações, e x, o
+% vetor dos termos independentes. A partir destes dados, é montada a matriz
+% [A x], que será triangularizada.
+% Retorna a solução do sistema (quando é SPD), a matriz triangularizada e o
+% tipo de sistema (SI = sistema impossível, SPI = sistema possível
+% indeterminado, SPD = sistema possível determinado).
     function res = is_triangularized(A)
     % Verifica se a matriz já está triangularizada
         sizeA = size(A);
@@ -43,15 +51,14 @@ function [sol, triang, tipo] = eliminacao_gauss(A, x)
         end
     end
 
-    function res = is_line_null(A, num_line)
-        % Verifica se a linha em questão já está zerada
+    function res = is_line_null(v)
+        % Verifica se o vetor recebido em questão já está zerado
         count_zeros = 0;
-        line_size = length(A(num_line,:)) - 1;
+        line_size = length(v);
 
         for i = 1:line_size
-            % Verifica o número de elementos nulos até o fim da linha,
-            % tirando a coluna referente aos elementos independentes
-            if A(num_line,i) == 0
+            % Verifica o número de elementos nulos até o fim do vetor
+            if v(i) == 0
                 count_zeros = count_zeros + 1;
             end
         end
@@ -63,44 +70,94 @@ function [sol, triang, tipo] = eliminacao_gauss(A, x)
         else
             res = 0;
         end
-    end 
+    end
 
-   sol = [];
-   triang = [];
-   tipo = '';
-   
-   sz = size(A);
-   lines = sz(1);
-   cols = sz(2);
-   A = [A x];
-   
-   if cols > lines
-       curr_col = 1;
-       while is_triangularized(A) == 0
+    function M = triangularize(M)
+    % Triangulariza a matriz recebida
+        szb = size(M);
+        lines = szb(1);
+        curr_col = 1;
+        
+        % Enquanto a matriz não está triangularizada, segue o processo
+        while is_triangularized(M) == 0
            lin = [];
            for i = 1:lines
+               % Encontra um pivô
                if curr_col == 1
-                   lin = A(i,:);
+                   lin = M(i,:);
                    break
-               else if is_line_done(A, curr_col) & A(i,curr_col) ~= 0
-                       lin = A(i,:);
+               else if is_line_done(M, curr_col) & M(i,curr_col) ~= 0
+                       lin = M(i,:);
                        break
                    end
                end
            end
-           
+
+           % Aplica a aritmética a todas as linhas, zerando a coluna abaixo
+           % do pivô
            for j = i + 1:lines
-               A(j,:) = A(j,:) - (lin * A(j,curr_col));
+               M(j,:) = M(j,:) - (lin * M(j,curr_col));
            end
-           
+
+           % Incrementa a coluna para buscar o próximo pivô
            curr_col = curr_col + 1;
-       end
-   else if lines > cols           
-           for i = lines:-1:1
-               lin1 = A(i,:) - 
+        end
+    end
+
+    sol = [];
+    triang = [];
+    tipo = '';
+
+    sz = size(A);
+    lines = sz(1);
+    cols = sz(2);
+    A = [A x];
+
+    % Se tem mais linhas que colunas, tenta eliminar as linhas em excesso
+    if lines > cols
+        M = A;
+        lines_removed = 0;
+        % A cada linha da matriz
+        for i = 1:lines
+           lin = M(i,:);
+
+           % Tenta eliminar as linhas múltiplas, uma a uma, de baixo para
+           % cima
+           for j = lines:-1:i + 1
+               zr = M(j,:)./lin;
+               zr = M(j,:) - (lin * zr(1));
+
+               if is_line_null(zr) == 1
+                   lines_removed = lines_removed + 1;
+                   M(j,:) = zr;
+               end
            end
+        end
+        
+        C = [];
+        % Verifica as linhas nulas e as remove, montando uma nova matriz
+        % que será triangularizada
+        for i = 1:lines
+            l = M(i,:);
+            if is_line_null(l) == 0
+               C = [C; l]; 
+            end
+        end
+        
+       szc = size(C);
+        
+       % Se as dimensões da matriz permanecem iguais, é um SI (não havia
+       % linhas múltiplas a serem eliminadas)
+       if szc(1) == lines & szc(2) == cols
+           tipo = 'SI';
+           triang = C;
+           sol = [];
+       else % Senão, triangulariza a matriz
+           A = triangularize(C);
+            A = [A; zeros(lines_removed, szb(2))];
+            triang = A;
        end
-   end
-   
-   triang = A;
+    else
+        triang = triangularize(A);
+    end
 end
