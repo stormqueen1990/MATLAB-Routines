@@ -104,6 +104,11 @@ function [sol, triang, tipo] = eliminacao_gauss(A, x)
         end
     end
 
+    function res = determine_system_type(M)
+    % Determina o tipo de sistema de equação encontrado
+        ,
+    end
+
     sol = [];
     triang = [];
     tipo = '';
