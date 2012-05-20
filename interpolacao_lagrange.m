@@ -1,4 +1,4 @@
-function poli = interpolacao_lagrange(x, y)
+function [poli, L] = interpolacao_lagrange(x, y)
 % Autores: Mauren Berti e Fernando Melo
 % Encontra o polinômio interpolador para os pontos x e y recebidos através
 % do método da interpolação de Lagrange. Retorna um vetor contendo os
