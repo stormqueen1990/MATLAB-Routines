@@ -4,9 +4,8 @@ function [sol, triang, tipo] = eliminacao_gauss(A, x)
 % Recebe 2 parâmetros: A, a matriz dos coeficientes das equações, e x, o
 % vetor dos termos independentes. A partir destes dados, é montada a matriz
 % [A x], que será triangularizada.
-% Retorna a solução do sistema (quando é SPD), a matriz triangularizada e o
-% tipo de sistema (SI = sistema impossível, SPI = sistema possível
-% indeterminado, SPD = sistema possível determinado).
+% Retorna a solução do sistema (somente quando é SPD), a matriz 
+% triangularizada e o tipo de sistema.
     function res = is_triangularized(A)
     % Verifica se a matriz já está triangularizada
         sizeA = size(A);
@@ -81,22 +80,23 @@ function [sol, triang, tipo] = eliminacao_gauss(A, x)
         % Enquanto a matriz não está triangularizada, segue o processo
         while is_triangularized(M) == 0
            lin = [];
-           for i = 1:lines
+           x = 0;
+           for i = curr_col:lines
+               x = i;
                % Encontra um pivô
-               if curr_col == 1
-                   lin = M(i,:);
+               done = is_line_done(M, curr_col);
+               pivot = M(x,curr_col);
+               
+               if (done == 1) & (pivot ~= 0)
+                   lin = M(x,:);
                    break
-               else if is_line_done(M, curr_col) & M(i,curr_col) ~= 0
-                       lin = M(i,:);
-                       break
-                   end
                end
            end
 
            % Aplica a aritmética a todas as linhas, zerando a coluna abaixo
            % do pivô
-           for j = i + 1:lines
-               M(j,:) = M(j,:) - (lin * M(j,curr_col));
+           for j = x + 1:lines
+               M(j,:) = M(j,:) - (lin * (M(j,curr_col)/lin(1, curr_col)));
            end
 
            % Incrementa a coluna para buscar o próximo pivô
@@ -106,12 +106,102 @@ function [sol, triang, tipo] = eliminacao_gauss(A, x)
 
     function res = determine_system_type(M)
     % Determina o tipo de sistema de equação encontrado
-        ,
+        [l, c] = size(M);
+        
+        % Verifica se a matriz tem mais colunas que linhas
+        if l < c - 1
+            ct_imp = 0;
+            for i1 = 1:l;
+                % Verifica se é SI
+                if is_line_null(M(i1, 1:c - 1)) == 1 && M(i1, c) ~= 0
+                    ct_imp = 1;
+                    break;
+                end
+            end
+            
+            if ct_imp == 0
+                % Se não é SI, só pode ser SPI
+                res = 2;
+            else
+                res = 1;
+            end
+        else
+            % Se a matriz tem mais linhas que colunas (excluindo-se a 
+            % coluna dos termos independentes), pode ser qualquer tipo de sistema
+            if l > c - 1
+                ct_imp = 0;
+                for i1 = 1:l;
+                    % Verifica se é SI
+                    if is_line_null(M(i1, c - 1)) == 1 && M(i1, c) ~= 0
+                        ct_imp = 1;
+                        break;
+                    end
+                end
+                
+                if ct_imp == 0
+                    % Se não é SI, pode ser SPI
+                    ct_null = 0;
+                    for i2 = 1:l
+                        ct_null = ct_null + is_line_null(M(i2,:));
+                    end
+                    
+                    % Se o número de linhas preenchidas é menor que o
+                    % número de colunas (fora a coluna dos TI), é SPI
+                    if ct_null > 0 && l - ct_null < c - 1
+                        res = 2;
+                    else
+                        % SPD
+                        res = 3;
+                    end
+                else
+                    res = 1;
+                end
+            else
+                % Se for quadrada (tirando a coluna dos TI), então pode ser
+                % qualquer coisa também
+                ct_imp = 0;
+                for i1 = 1:l;
+                    % Verifica se é SI
+                    if is_line_null(M(i1,1:c - 1)) == 1 && M(i1, c) ~= 0
+                        ct_imp = 1;
+                        break;
+                    end
+                end
+                
+                if ct_imp == 0
+                    ct_null = 0;
+                    for i2 = 1:l
+                        ct_null = ct_null + is_line_null(M(i2,:));
+                    end
+                    
+                    if ct_null == 0
+                        res = 3;
+                    else
+                        res = 2;
+                    end
+                else
+                    res = 1;
+                end
+            end
+        end
     end
 
+    function x = retrosub_spd(A, b)
+    % Soluciona a retrosubstituição sendo que A é triangular superior e b é o 
+    % vetor dos termos independentes, e o sistema é possível e determinado.
+        n = length(b);
+        x = zeros(size(b));
+
+        for i = n:-1:1
+            x(i) = (b(i) - A(i,:) * x)/A(i,i);
+        end
+    end
+
+    system_type = {'Impossível'; 'Possível e indeterminado'; 'Possível e determinado'};
     sol = [];
     triang = [];
     tipo = '';
+    res = 0;
 
     sz = size(A);
     lines = sz(1);
@@ -154,15 +244,24 @@ function [sol, triang, tipo] = eliminacao_gauss(A, x)
        % Se as dimensões da matriz permanecem iguais, é um SI (não havia
        % linhas múltiplas a serem eliminadas)
        if szc(1) == lines & szc(2) == cols
-           tipo = 'SI';
+           res = 1;
            triang = C;
            sol = [];
        else % Senão, triangulariza a matriz
            A = triangularize(C);
-            A = [A; zeros(lines_removed, szb(2))];
-            triang = A;
+           A = [A; zeros(lines_removed, szb(2))];
+           triang = A;
        end
     else
         triang = triangularize(A);
+    end
+    
+    res = determine_system_type(triang);
+    tipo = system_type(res);
+    
+    % Encontra a solução do sistema
+    if res == 3
+        szt = size(triang);
+        sol = retrosub_spd(triang(:,1:szt(2) - 1), triang(:,szt(2)));
     end
 end
